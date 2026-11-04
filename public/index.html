@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Circuit toolkit</title>
+<meta name="description" content="Bench calculators: resistor color codes, voltage dividers, RC filters, LED resistors and Ohm's law.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='5' y='9' width='22' height='14' rx='7' fill='%23dcc79a' stroke='%2315232b'/%3E%3Crect x='11' y='9' width='3' height='14' fill='%236b3f1f'/%3E%3Crect x='16' y='9' width='3' height='14' fill='%231a1a1a'/%3E%3Crect x='21' y='9' width='3' height='14' fill='%23c62828'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #f1f3ee;
+    --ink: #15232b;
+    --ink-soft: #4b5a62;
+    --pcb: #0e5c44;
+    --copper: #a9672f;
+    --rule: #cdd5cc;
+    --grid: rgba(21, 35, 43, 0.045);
+    --error: #9b2c1f;
+    --head: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+    --body: "Instrument Sans", "Helvetica Neue", Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background-color: var(--paper);
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 24px 24px;
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 17px;
+    line-height: 1.5;
+  }
+  .page { max-width: 1040px; margin: 0 auto; padding: 40px 20px 72px; }
+  header { margin-bottom: 36px; }
+  h1 { font-family: var(--head); font-weight: 700; font-size: clamp(2rem, 5vw, 3rem); line-height: 1.05; letter-spacing: -0.02em; margin: 0 0 10px; }
+  header p { margin: 0; max-width: 52ch; color: var(--ink-soft); }
+
+  .layout { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 40px; align-items: start; }
+  nav ul { list-style: none; margin: 0; padding: 0; }
+  nav button {
+    display: block; width: 100%; text-align: left; background: none; border: 0;
+    border-left: 3px solid var(--rule); padding: 10px 14px; margin: 0;
+    font: 500 1rem/1.3 var(--body); color: var(--ink-soft); cursor: pointer;
+  }
+  nav button:hover { color: var(--ink); }
+  nav button[aria-current="true"] { border-left-color: var(--pcb); color: var(--ink); font-weight: 600; }
+  :focus-visible { outline: 3px solid var(--copper); outline-offset: 2px; }
+
+  h2 { font-family: var(--head); font-weight: 700; font-size: 1.6rem; letter-spacing: -0.01em; margin: 0 0 6px; }
+  .lede { margin: 0 0 24px; color: var(--ink-soft); max-width: 58ch; }
+
+  /* Resistor drawing */
+  .resistor { width: 100%; max-width: 560px; height: auto; display: block; margin: 0 0 8px; }
+  .resistor .band { transition: fill 0.18s ease; }
+
+  .toggle { display: inline-flex; border: 1.5px solid var(--ink); border-radius: 6px; overflow: hidden; margin-bottom: 20px; }
+  .toggle button { background: none; border: 0; padding: 6px 16px; font: 500 0.95rem var(--body); color: var(--ink); cursor: pointer; }
+  .toggle button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+
+  .band-row { margin: 0 0 14px; }
+  .band-row .name { font-weight: 600; font-size: 0.95rem; margin-bottom: 6px; }
+  .swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+  .swatch {
+    width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid rgba(21,35,43,0.35);
+    cursor: pointer; padding: 0;
+  }
+  .swatch[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--paper), 0 0 0 5px var(--ink); }
+
+  /* Results */
+  .result { margin: 28px 0 0; padding-top: 20px; border-top: 1.5px solid var(--ink); }
+  .big { font-family: var(--head); font-weight: 700; font-size: clamp(2.2rem, 6vw, 3.4rem); line-height: 1.05; color: var(--pcb); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .sub { color: var(--ink-soft); margin-top: 4px; }
+  dl.facts { display: grid; grid-template-columns: max-content 1fr; gap: 6px 24px; margin: 18px 0 0; }
+  dl.facts dt { color: var(--ink-soft); }
+  dl.facts dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  /* Forms */
+  form.fields { display: grid; gap: 16px; max-width: 420px; }
+  label.field { display: grid; gap: 4px; font-weight: 600; font-size: 0.95rem; }
+  label.field span.hint { font-weight: 400; color: var(--ink-soft); }
+  input[type="text"] {
+    font: 500 1.1rem var(--body); font-variant-numeric: tabular-nums; color: var(--ink);
+    background: #fff; border: 1.5px solid var(--ink); border-radius: 6px; padding: 9px 12px; width: 100%;
+  }
+  .radios { display: flex; gap: 20px; }
+  .radios label { font-weight: 500; display: flex; gap: 6px; align-items: center; }
+
+  .status { min-height: 1.5em; margin-top: 14px; color: var(--error); font-weight: 500; }
+  .note { color: var(--ink-soft); margin-top: 14px; max-width: 58ch; }
+
+  .plot { width: 100%; max-width: 640px; height: auto; display: block; margin-top: 22px; }
+  .plot text { font: 500 11px var(--body); fill: var(--ink-soft); }
+
+  footer { margin-top: 56px; color: var(--ink-soft); font-size: 0.9rem; }
+
+  @media (max-width: 760px) {
+    .layout { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+    nav ul { display: flex; overflow-x: auto; border-bottom: 1.5px solid var(--rule); }
+    nav button { border-left: 0; border-bottom: 3px solid transparent; white-space: nowrap; width: auto; }
+    nav button[aria-current="true"] { border-bottom-color: var(--pcb); }
+  }
+  @media (prefers-reduced-motion: reduce) { .resistor .band { transition: none; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <h1>Circuit toolkit</h1>
+    <p>Calculators for the bench. Pick a tool, type values like 4.7k, 100n or 20m, and the answer updates as you type. The math runs in Python on the server.</p>
+  </header>
+
+  <div class="layout">
+    <nav aria-label="Tools"><ul id="tool-list"></ul></nav>
+    <main id="panel" tabindex="-1"></main>
+  </div>
+
+  <footer>Source and build notes are in the project README.</footer>
+</div>
+
+<script>
+"use strict";
+
+/* ---------- helpers ---------- */
+
+const PREFIXES = [
+  [1e9, "G"], [1e6, "M"], [1e3, "k"], [1, ""], [1e-3, "m"], [1e-6, "µ"], [1e-9, "n"], [1e-12, "p"],
+];
+
+// "4.7k" -> 4700, "100n" -> 1e-7, "20mA" -> 0.02. Returns null if it can't be read.
+function parseValue(text) {
+  const m = String(text).trim().match(/^(-?\d*\.?\d+(?:e[-+]?\d+)?)\s*([pnuµmkKMG]?)\s*[a-zA-ZΩ]*$/);
+  if (!m) return null;
+  const mult = { p: 1e-12, n: 1e-9, u: 1e-6, "µ": 1e-6, m: 1e-3, "": 1, k: 1e3, K: 1e3, M: 1e6, G: 1e9 }[m[2]];
+  return parseFloat(m[1]) * mult;
+}
+
+// 0.0000047 -> "4.7 µ" + unit
+function fmt(value, unit) {
+  if (value === 0 || !isFinite(value)) return `0 ${unit}`;
+  const abs = Math.abs(value);
+  let pick = PREFIXES[PREFIXES.length - 1];
+  for (const p of PREFIXES) { if (abs >= p[0] * 0.9995) { pick = p; break; } }
+  const num = Number((value / pick[0]).toPrecision(4));
+  return `${num} ${pick[1]}${unit}`;
+}
+
+async function callApi(tool, inputs) {
+  const res = await fetch("/api/calculate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tool, inputs }),
+  });
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error);
+  return data.result;
+}
+
+function el(html) {
+  const t = document.createElement("template");
+  t.innerHTML = html.trim();
+  return t.content.firstElementChild;
+}
+
+function debounce(fn, ms) {
+  let id;
+  return (...args) => { clearTimeout(id); id = setTimeout(() => fn(...args), ms); };
+}
+
+/* ---------- resistor color tool ---------- */
+
+const COLOR_HEX = {
+  black: "#1a1a1a", brown: "#6b3f1f", red: "#c62828", orange: "#e8710a", yellow: "#f2c200",
+  green: "#2e8b3e", blue: "#1f5fbf", violet: "#7a3fa0", grey: "#8a8f94", white: "#f5f5f2",
+  gold: "#c9a227", silver: "#b9bec3",
+};
+const DIGIT_COLORS = ["black", "brown", "red", "orange", "yellow", "green", "blue", "violet", "grey", "white"];
+const MULT_COLORS = [...DIGIT_COLORS, "gold", "silver"];
+const TOL_COLORS = ["brown", "red", "green", "blue", "violet", "grey", "gold", "silver"];
+
+function resistorTool(panel) {
+  let count = 4;
+  const bands = {
+    4: ["brown", "black", "red", "gold"],
+    5: ["brown", "black", "black", "red", "brown"],
+  };
+
+  panel.innerHTML = `
+    <h2>Resistor color code</h2>
+    <p class="lede">Choose the colors printed on the resistor, starting from the band closest to one end.</p>
+    <svg class="resistor" id="drawing" viewBox="0 0 500 140" role="img" aria-label="Resistor with colored bands"></svg>
+    <div class="toggle" role="group" aria-label="Number of bands">
+      <button type="button" data-count="4" aria-pressed="true">4 bands</button>
+      <button type="button" data-count="5" aria-pressed="false">5 bands</button>
+    </div>
+    <div id="pickers"></div>
+    <div class="result" aria-live="polite">
+      <div class="big" id="r-value">&nbsp;</div>
+      <div class="sub" id="r-range"></div>
+    </div>
+    <div class="status" id="status" role="alert"></div>`;
+
+  const drawing = panel.querySelector("#drawing");
+  const pickers = panel.querySelector("#pickers");
+
+  function labelsFor(n) {
+    return n === 4
+      ? [["First digit", DIGIT_COLORS], ["Second digit", DIGIT_COLORS], ["Multiplier", MULT_COLORS], ["Tolerance", TOL_COLORS]]
+      : [["First digit", DIGIT_COLORS], ["Second digit", DIGIT_COLORS], ["Third digit", DIGIT_COLORS], ["Multiplier", MULT_COLORS], ["Tolerance", TOL_COLORS]];
+  }
+
+  function draw() {
+    const xs = count === 4 ? [135, 180, 225, 345] : [125, 165, 205, 245, 350];
+    drawing.innerHTML = `
+      <line x1="10" y1="70" x2="125" y2="70" stroke="#8a8f94" stroke-width="7" stroke-linecap="round"/>
+      <line x1="375" y1="70" x2="490" y2="70" stroke="#8a8f94" stroke-width="7" stroke-linecap="round"/>
+      <rect x="85" y="26" width="330" height="88" rx="34" fill="#dcc79a" stroke="#15232b" stroke-opacity="0.35" stroke-width="2"/>
+      ${bands[count].map((c, i) =>
+        `<rect class="band" x="${xs[i]}" y="26" width="20" height="88" fill="${COLOR_HEX[c]}" stroke="#15232b" stroke-opacity="0.25"/>`
+      ).join("")}`;
+  }
+
+  function buildPickers() {
+    pickers.innerHTML = "";
+    labelsFor(count).forEach(([name, colors], i) => {
+      const row = el(`<div class="band-row"><div class="name">${name}</div><div class="swatches"></div></div>`);
+      const box = row.querySelector(".swatches");
+      colors.forEach((c) => {
+        const b = el(`<button type="button" class="swatch" aria-label="${name}: ${c}" title="${c}" aria-pressed="${bands[count][i] === c}" style="background:${COLOR_HEX[c]}"></button>`);
+        b.addEventListener("click", () => { bands[count][i] = c; refresh(); });
+        box.appendChild(b);
+      });
+      pickers.appendChild(row);
+    });
+  }
+
+  async function calculate() {
+    const status = panel.querySelector("#status");
+    try {
+      const r = await callApi("resistor_colors", { bands: bands[count] });
+      panel.querySelector("#r-value").textContent = `${r.label} ±${r.tolerance_percent}%`;
+      panel.querySelector("#r-range").textContent = `Actual value is between ${fmt(r.min_ohms, "Ω")} and ${fmt(r.max_ohms, "Ω")}.`;
+      status.textContent = "";
+    } catch (err) {
+      status.textContent = err.message;
+    }
+  }
+
+  function refresh() {
+    draw();
+    pickers.querySelectorAll(".band-row").forEach((row, i) => {
+      row.querySelectorAll(".swatch").forEach((b) => {
+        b.setAttribute("aria-pressed", String(b.title === bands[count][i]));
+      });
+    });
+    calculate();
+  }
+
+  panel.querySelectorAll(".toggle button").forEach((b) => {
+    b.addEventListener("click", () => {
+      count = Number(b.dataset.count);
+      panel.querySelectorAll(".toggle button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+      buildPickers();
+      refresh();
+    });
+  });
+
+  buildPickers();
+  refresh();
+}
+
+/* ---------- generic form tools ---------- */
+
+// spec: { title, lede, fields:[{id,label,value,hint,optional}], tool, payload(values)->object, render(result,values)->html, extra? }
+function formTool(panel, spec) {
+  panel.innerHTML = `
+    <h2>${spec.title}</h2>
+    <p class="lede">${spec.lede}</p>
+    <form class="fields" autocomplete="off" novalidate>
+      ${spec.fields.map((f) => `
+        <label class="field">${f.label}${f.hint ? ` <span class="hint">${f.hint}</span>` : ""}
+          <input type="text" inputmode="decimal" id="f-${f.id}" value="${f.value}" spellcheck="false">
+        </label>`).join("")}
+      ${spec.radios ? `<div class="radios" role="radiogroup" aria-label="${spec.radios.label}">
+        ${spec.radios.options.map((o, i) => `<label><input type="radio" name="kind" value="${o[0]}" ${i === 0 ? "checked" : ""}> ${o[1]}</label>`).join("")}
+      </div>` : ""}
+    </form>
+    <div class="status" id="status" role="alert"></div>
+    <div class="result" id="out" aria-live="polite"></div>
+    ${spec.note ? `<p class="note">${spec.note}</p>` : ""}`;
+
+  const status = panel.querySelector("#status");
+  const out = panel.querySelector("#out");
+
+  const run = debounce(async () => {
+    const values = {};
+    for (const f of spec.fields) {
+      const raw = panel.querySelector(`#f-${f.id}`).value.trim();
+      if (raw === "" && f.optional) { values[f.id] = null; continue; }
+      const v = parseValue(raw);
+      if (v === null) {
+        status.textContent = `${f.label}: enter a number such as 4.7k, 100n or 0.02.`;
+        out.innerHTML = "";
+        return;
+      }
+      values[f.id] = v;
+    }
+    if (spec.radios) values.kind = panel.querySelector('input[name="kind"]:checked').value;
+    if (spec.check) {
+      const msg = spec.check(values);
+      if (msg) { status.textContent = msg; out.innerHTML = ""; return; }
+    }
+    try {
+      const result = await callApi(spec.tool, spec.payload(values));
+      status.textContent = "";
+      out.innerHTML = spec.render(result, values);
+    } catch (err) {
+      status.textContent = err.message;
+      out.innerHTML = "";
+    }
+  }, 150);
+
+  panel.querySelectorAll("input").forEach((i) => i.addEventListener("input", run));
+  run();
+}
+
+function dividerTool(panel) {
+  formTool(panel, {
+    title: "Voltage divider",
+    lede: "Two resistors in series split a voltage. The output is measured across R2, the bottom resistor.",
+    fields: [
+      { id: "vin", label: "Input voltage", value: "5", hint: "volts" },
+      { id: "r1", label: "R1, top resistor", value: "10k", hint: "ohms" },
+      { id: "r2", label: "R2, bottom resistor", value: "10k", hint: "ohms" },
+    ],
+    tool: "voltage_divider",
+    payload: (v) => ({ vin: v.vin, r1: v.r1, r2: v.r2 }),
+    render: (r, v) => `
+      <div class="big">${fmt(r.vout, "V")}</div>
+      <div class="sub">at the output</div>
+      <dl class="facts">
+        <dt>Current through both</dt><dd>${fmt(r.current_a, "A")}</dd>
+        <dt>Power in R1</dt><dd>${fmt(r.power_r1_w, "W")}</dd>
+        <dt>Power in R2</dt><dd>${fmt(r.power_r2_w, "W")}</dd>
+      </dl>`,
+    note: "The output only holds if whatever you connect to it draws very little current compared with the divider's own current.",
+  });
+}
+
+function ledTool(panel) {
+  formTool(panel, {
+    title: "LED resistor",
+    lede: "Find the series resistor that limits an LED to a safe current, then round up to a value you can actually buy.",
+    fields: [
+      { id: "vs", label: "Supply voltage", value: "5", hint: "volts" },
+      { id: "vf", label: "LED forward voltage", value: "2", hint: "volts, from the datasheet; red is about 2 V" },
+      { id: "i", label: "LED current", value: "20m", hint: "amps; 20m means 20 mA" },
+    ],
+    tool: "led_resistor",
+    payload: (v) => ({ vsupply: v.vs, vforward: v.vf, current_ma: v.i * 1000 }),
+    check: (v) => (v.i <= 0 ? "LED current must be greater than zero." : ""),
+    render: (r) => `
+      <div class="big">${r.standard_label}</div>
+      <div class="sub">nearest standard value that keeps current at or below your target</div>
+      <dl class="facts">
+        <dt>Exact value needed</dt><dd>${fmt(r.exact_ohms, "Ω")}</dd>
+        <dt>Actual LED current</dt><dd>${fmt(r.actual_current_ma / 1000, "A")}</dd>
+        <dt>Power in the resistor</dt><dd>${fmt(r.resistor_power_w, "W")}</dd>
+      </dl>`,
+    note: "Standard values come from the E24 series. A quarter-watt resistor is fine when the power shown is under about 0.125 W.",
+  });
+}
+
+function ohmTool(panel) {
+  formTool(panel, {
+    title: "Ohm's law",
+    lede: "Fill in any two of voltage, current and resistance. Leave the third blank and it is worked out for you.",
+    fields: [
+      { id: "voltage", label: "Voltage", value: "12", hint: "volts", optional: true },
+      { id: "current", label: "Current", value: "", hint: "amps", optional: true },
+      { id: "resistance", label: "Resistance", value: "6", hint: "ohms", optional: true },
+    ],
+    tool: "ohms_law",
+    payload: (v) => ({ voltage: v.voltage, current: v.current, resistance: v.resistance }),
+    check: (v) => {
+      const filled = [v.voltage, v.current, v.resistance].filter((x) => x !== null).length;
+      return filled === 2 ? "" : "Fill in exactly two of the three fields.";
+    },
+    render: (r) => `
+      <div class="big">${fmt(r.power_w, "W")}</div>
+      <div class="sub">power dissipated</div>
+      <dl class="facts">
+        <dt>Voltage</dt><dd>${fmt(r.voltage_v, "V")}</dd>
+        <dt>Current</dt><dd>${fmt(r.current_a, "A")}</dd>
+        <dt>Resistance</dt><dd>${fmt(r.resistance_ohm, "Ω")}</dd>
+      </dl>`,
+  });
+}
+
+/* ---------- RC filter with frequency-response plot ---------- */
+
+function bodePlot(curve, cutoff) {
+  const W = 640, H = 310, L = 54, R = 16, T = 28, B = 40;
+  const fMin = curve[0].freq_hz, fMax = curve[curve.length - 1].freq_hz;
+  const dbMin = -40, dbMax = 0;
+  const x = (f) => L + ((Math.log10(f) - Math.log10(fMin)) / (Math.log10(fMax) - Math.log10(fMin))) * (W - L - R);
+  const y = (db) => T + ((dbMax - Math.max(db, dbMin)) / (dbMax - dbMin)) * (H - T - B);
+
+  let grid = "";
+  for (let db = dbMin; db <= dbMax; db += 10) {
+    grid += `<line x1="${L}" x2="${W - R}" y1="${y(db)}" y2="${y(db)}" stroke="#cdd5cc"/><text x="${L - 8}" y="${y(db) + 4}" text-anchor="end">${db}</text>`;
+  }
+  const decades = [];
+  for (let e = Math.ceil(Math.log10(fMin)); e <= Math.floor(Math.log10(fMax)); e++) decades.push(10 ** e);
+  decades.forEach((f) => {
+    grid += `<line x1="${x(f)}" x2="${x(f)}" y1="${T}" y2="${H - B}" stroke="#cdd5cc"/><text x="${x(f)}" y="${H - B + 18}" text-anchor="middle">${fmt(f, "Hz")}</text>`;
+  });
+
+  const path = curve.map((p, i) => `${i ? "L" : "M"}${x(p.freq_hz).toFixed(1)},${y(p.gain_db).toFixed(1)}`).join(" ");
+  return `
+    <svg class="plot" viewBox="0 0 ${W} ${H}" role="img" aria-label="Gain in decibels versus frequency, with the cutoff frequency marked at ${fmt(cutoff, "Hz")}">
+      ${grid}
+      <line x1="${L}" x2="${W - R}" y1="${y(-3.01)}" y2="${y(-3.01)}" stroke="#a9672f" stroke-dasharray="4 4"/>
+      <line x1="${x(cutoff)}" x2="${x(cutoff)}" y1="${T}" y2="${H - B}" stroke="#a9672f" stroke-dasharray="4 4"/>
+      <path d="${path}" fill="none" stroke="#0e5c44" stroke-width="3" stroke-linejoin="round"/>
+      <circle cx="${x(cutoff)}" cy="${y(-3.01)}" r="5" fill="#a9672f"/>
+      <text x="${L}" y="12">Gain (dB)</text>
+      <text x="${W - R}" y="${H - 4}" text-anchor="end">Frequency</text>
+    </svg>`;
+}
+
+function rcTool(panel) {
+  formTool(panel, {
+    title: "RC filter",
+    lede: "A resistor and a capacitor make a simple filter. The cutoff is where the signal has dropped to about 70% of its size, which is 3 dB down.",
+    fields: [
+      { id: "r", label: "Resistance", value: "1k", hint: "ohms" },
+      { id: "c", label: "Capacitance", value: "100n", hint: "farads; 100n means 100 nF" },
+    ],
+    radios: { label: "Filter type", options: [["lowpass", "Low-pass"], ["highpass", "High-pass"]] },
+    tool: "rc_filter",
+    payload: (v) => ({ r: v.r, c: v.c, kind: v.kind }),
+    check: (v) => (v.r <= 0 || v.c <= 0 ? "Resistance and capacitance must be greater than zero." : ""),
+    render: (r) => `
+      <div class="big">${fmt(r.cutoff_hz, "Hz")}</div>
+      <div class="sub">cutoff frequency</div>
+      <dl class="facts">
+        <dt>Time constant</dt><dd>${fmt(r.tau_s, "s")}</dd>
+        <dt>Passes</dt><dd>${r.kind === "lowpass" ? "frequencies below the cutoff" : "frequencies above the cutoff"}</dd>
+      </dl>
+      ${bodePlot(r.curve, r.cutoff_hz)}`,
+  });
+}
+
+/* ---------- navigation ---------- */
+
+const TOOLS = [
+  { id: "colors", name: "Resistor colors", run: resistorTool },
+  { id: "divider", name: "Voltage divider", run: dividerTool },
+  { id: "rc", name: "RC filter", run: rcTool },
+  { id: "led", name: "LED resistor", run: ledTool },
+  { id: "ohm", name: "Ohm's law", run: ohmTool },
+];
+
+const list = document.getElementById("tool-list");
+const panel = document.getElementById("panel");
+
+function show(id, pushHash) {
+  const tool = TOOLS.find((t) => t.id === id) || TOOLS[0];
+  list.querySelectorAll("button").forEach((b) => b.setAttribute("aria-current", String(b.dataset.id === tool.id)));
+  tool.run(panel);
+  if (pushHash) history.replaceState(null, "", "#" + tool.id);
+}
+
+TOOLS.forEach((t) => {
+  const li = document.createElement("li");
+  const b = document.createElement("button");
+  b.type = "button";
+  b.dataset.id = t.id;
+  b.textContent = t.name;
+  b.addEventListener("click", () => show(t.id, true));
+  li.appendChild(b);
+  list.appendChild(li);
+});
+
+show(location.hash.slice(1), false);
+</script>
+</body>
+</html>
